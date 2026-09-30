@@ -19,6 +19,34 @@ different days, 288 trials per session).
 5. **Robustness.** Cross-subject failure analysis, artifact/noise injection,
    window length vs. accuracy and latency.
 
+## Phase 1 in detail
+
+The classical baseline establishes what the signal is before a neural network
+abstracts it away.
+
+**Background.** Imagining a movement suppresses 8–30 Hz (mu/beta) oscillations
+over the corresponding motor cortex, known as event-related desynchronization.
+Right-hand imagery suppresses power over the left hemisphere and vice versa; feet
+and tongue produce different spatial patterns. Classes are therefore separable by
+*where* band power drops.
+
+1. **Load.** MOABB downloads the dataset. Each run is a continuous recording of
+   22 EEG channels at 250 Hz, with event markers for cue onset and class.
+2. **Filter.** Causal 8–30 Hz bandpass on each continuous run, isolating the
+   mu/beta band and removing drift, muscle noise and line interference.
+3. **Epoch.** Slice cue + 0.5 s to cue + 2.5 s at each marker. Each trial becomes a
+   22 × 500 array with a label; 288 trials per subject per session.
+4. **Spatial filtering (CSP).** Single electrodes are noisy; weighted combinations
+   of electrodes give cleaner estimates of activity over a region. Common Spatial
+   Patterns learns the weightings whose output power differs most between classes.
+   Eight components are kept.
+5. **Features.** Log-variance of each component over the window, i.e. band power.
+   Each trial reduces from 11,000 values to 8.
+6. **Classify.** Linear Discriminant Analysis fits linear boundaries between the
+   four classes in that 8-dimensional feature space.
+7. **Evaluate.** Fit on session T, score on session E (a different day). Report
+   accuracy, kappa and ITR.
+
 ## Decisions
 
 ### Causal filtering only
