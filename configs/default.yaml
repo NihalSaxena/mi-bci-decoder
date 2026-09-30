@@ -1,0 +1,23 @@
+# Single source of truth for the pipeline. Sections get added as each
+# phase lands (csp, eegnet, train, metrics, ...).
+
+dataset:
+  name: BNCI2014_001          # BCI Competition IV 2a, loaded via MOABB
+  subjects: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+  sfreq: 250                  # Hz
+  n_channels: 22              # EEG only; the 3 EOG channels are dropped
+  n_classes: 4                # left hand, right hand, feet, tongue
+
+epoching:
+  cue_offset_s: 2.0           # MOABB event marks trial start; cue appears at +2 s
+  tmin_s: 0.5                 # decode window start, relative to cue
+  tmax_s: 2.5                 # decode window end -> 2 s = 500 samples
+
+filters:
+  csp:    {l_freq: 8.0, h_freq: 30.0, order: 4}   # mu/beta band for CSP+LDA
+  eegnet: {l_freq: 4.0, h_freq: 40.0, order: 4}   # wider; EEGNet learns its own filters
+
+paths:
+  processed: data/processed
+  artifacts: artifacts
+  results: reports/results

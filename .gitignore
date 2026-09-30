@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# Generated data and outputs (reproducible from scripts)
+data/
+artifacts/
+reports/results/
+*.onnx
+
+# Rust
+rust/target/
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/

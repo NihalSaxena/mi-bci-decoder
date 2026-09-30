@@ -1,0 +1,1 @@
+"""Motor-imagery BCI decoder."""
