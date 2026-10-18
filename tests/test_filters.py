@@ -1,7 +1,9 @@
+import json
+
 import numpy as np
 from scipy import signal
 
-from bci.filters import causal_filter, design_bandpass
+from bci.filters import causal_filter, design_bandpass, filter_spec
 
 SFREQ = 250.0
 
@@ -62,3 +64,21 @@ def test_passband_and_stopband():
     assert gain[1] > 0.95   # 15 Hz: mu/beta passes
     assert gain[0] < 0.01   # 2 Hz: drift removed
     assert gain[2] < 0.05   # 50 Hz: line noise removed
+
+
+def test_spec_reproduces_filter_after_json_round_trip():
+    # The engine only sees the JSON, so filtering with the coefficients and
+    # initial-state rule read back from it must match causal_filter exactly.
+    spec = json.loads(json.dumps(filter_spec(
+        "csp", 8.0, 30.0, 4, SFREQ, [f"ch{i}" for i in range(22)],
+        cue_offset_s=2.0, tmin_s=0.5, tmax_s=2.5,
+    )))
+    x = _eeg_like()
+    sos = np.array(spec["sos"])
+    zi = np.array(spec["zi_unit_step"])[:, None, :] * x[:, 0][None, :, None]
+    y_spec, _ = signal.sosfilt(sos, x, axis=-1, zi=zi)
+    y_ref, _ = causal_filter(x, _sos())
+
+    np.testing.assert_array_equal(y_spec, y_ref)
+    assert len(spec["channels"]) == 22
+    assert spec["window"]["n_samples"] == 500
