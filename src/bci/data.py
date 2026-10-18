@@ -21,6 +21,7 @@ class Run:
     onsets: np.ndarray  # (n_trials,) sample index of each trial start
     labels: np.ndarray  # (n_trials,) class index into CLASSES
     sfreq: float
+    ch_names: list[str]  # EEG channel order, matching data's rows
 
 
 def load_subject(subject: int) -> dict[str, list[Run]]:
@@ -41,11 +42,13 @@ def _to_run(raw) -> Run:
     # trial's first sample. EOG channels are dropped by picking EEG only.
     stim = raw.get_data(picks="stim")[0]
     onsets = np.flatnonzero(stim)
+    types = raw.get_channel_types()
     return Run(
         data=raw.get_data(picks="eeg") * 1e6,
         onsets=onsets,
         labels=stim[onsets].astype(int) - 1,
         sfreq=raw.info["sfreq"],
+        ch_names=[n for n, t in zip(raw.ch_names, types) if t == "eeg"],
     )
 
 

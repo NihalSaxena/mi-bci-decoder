@@ -39,3 +39,44 @@ def causal_filter(
     if zi is None:
         zi = initial_state(sos, x[:, 0])
     return signal.sosfilt(sos, x, axis=-1, zi=zi)
+
+
+def filter_spec(
+    name: str,
+    l_freq: float,
+    h_freq: float,
+    order: int,
+    sfreq: float,
+    ch_names: list[str],
+    cue_offset_s: float,
+    tmin_s: float,
+    tmax_s: float,
+) -> dict:
+    """Everything the real-time engine needs to reproduce preprocessing exactly.
+
+    JSON-serialisable; written to artifacts/filters/<name>.json. See
+    docs/DESIGN.md, "Filter spec as a contract".
+    """
+    sos = design_bandpass(l_freq, h_freq, sfreq, order)
+    return {
+        "name": name,
+        "design": "butterworth bandpass, second-order sections",
+        "band_hz": [l_freq, h_freq],
+        "order": order,
+        "sfreq": sfreq,
+        # Each row is [b0, b1, b2, a0, a1, a2]; sections run in order.
+        "sos": sos.tolist(),
+        # scipy.signal.sosfilt runs each section in transposed direct form II,
+        # with two state values per section.
+        "form": "direct form II transposed",
+        "initial_state": "zi_unit_step scaled by each channel's first sample",
+        "zi_unit_step": signal.sosfilt_zi(sos).tolist(),
+        "channels": list(ch_names),
+        "units": "uV",
+        "window": {
+            "cue_offset_s": cue_offset_s,
+            "tmin_s": tmin_s,
+            "tmax_s": tmax_s,
+            "n_samples": round((tmax_s - tmin_s) * sfreq),
+        },
+    }
