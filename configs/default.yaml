@@ -17,6 +17,9 @@ filters:
   csp:    {l_freq: 8.0, h_freq: 30.0, order: 4}   # mu/beta band for CSP+LDA
   eegnet: {l_freq: 4.0, h_freq: 40.0, order: 4}   # wider; EEGNet learns its own filters
 
+csp:
+  n_components: 8             # virtual electrodes kept (spatial filters)
+
 metrics:
   trial_duration_s: 8.0       # full trial for ITR, not the 2 s decode window (~4x inflation)
 
