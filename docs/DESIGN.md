@@ -71,6 +71,16 @@ definition.
 8–30 Hz (mu/beta) for CSP. 4–40 Hz for EEGNet, whose first layer learns its own
 temporal filters. The deployed model's band is the one the engine implements.
 
+### EEGNet architecture
+EEGNet-8,2 (Lawhern et al., 2018): 8 temporal filters of 64 samples, 2 spatial
+(depthwise) filters per temporal filter for 16 virtual channels, a separable
+convolution of 16 samples with 16 output maps, average pooling ÷4 then ÷8, and
+dropout 0.5. For a 22 × 500 input this is 2,420 parameters. The 64-sample kernel
+spans 0.26 s at 250 Hz; the paper's 64 samples were 0.5 s at 128 Hz. Time-axis
+padding is explicit (zero-pad, then convolve) so lengths stay 500 and 125. The
+model outputs logits; softmax is applied by the loss and at prediction time. The
+paper's max-norm weight constraints are omitted.
+
 ### Epoch window
 MOABB events mark trial start; the cue appears at +2.0 s. The decode window is
 cue + 0.5 s to cue + 2.5 s (500 samples). Data are converted to µV.
