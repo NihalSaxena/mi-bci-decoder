@@ -81,6 +81,17 @@ padding is explicit (zero-pad, then convolve) so lengths stay 500 and 125. The
 model outputs logits; softmax is applied by the loss and at prediction time. The
 paper's max-norm weight constraints are omitted.
 
+### EEGNet training
+Cross-entropy loss, Adam with learning rate 1e-3, batches of 32. A stratified 20%
+of session T is held out for validation; training stops once validation loss has
+not improved for 50 epochs (at most 300), and the weights from the best
+validation epoch are restored. Session E is never used for training or stopping;
+it is scored once at the end. Inputs are the filtered µV trials with no further
+scaling; the BatchNorm after the first layer handles scale. Seeds fix weight
+initialisation, the validation split, batch order and dropout. Training runs on
+the Apple GPU (MPS, about 27× faster than CPU here); MPS results are seeded but
+not guaranteed bit-identical, so tests run on CPU.
+
 ### Epoch window
 MOABB events mark trial start; the cue appears at +2.0 s. The decode window is
 cue + 0.5 s to cue + 2.5 s (500 samples). Data are converted to µV.
