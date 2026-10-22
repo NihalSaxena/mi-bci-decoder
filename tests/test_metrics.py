@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from sklearn.metrics import cohen_kappa_score
 
-from bci.metrics import accuracy, confusion_matrix, itr, kappa
+from bci.metrics import accuracy, confusion_matrix, itr, kappa, score
 
 # 16 trials, 4 of each class.
 Y_TRUE = np.array([0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3])
@@ -55,3 +55,11 @@ def test_itr_known_value():
 def test_itr_uses_trial_duration():
     # The 2 s decode window would inflate ITR 4x versus the 8 s trial.
     assert itr(0.7, 4, 2.0) == pytest.approx(4 * itr(0.7, 4, 8.0))
+
+
+def test_score_bundles_the_metrics():
+    y_pred = np.tile([0, 1, 2, 3], 4)
+    s = score(Y_TRUE, y_pred, 4, 8.0)
+    assert s["accuracy"] == 0.25 and s["itr_bits_per_min"] == 0.0
+    assert s["kappa"] == pytest.approx(0.0)
+    assert np.array(s["confusion"]).sum() == 16

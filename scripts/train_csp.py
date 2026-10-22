@@ -14,14 +14,9 @@ import mne
 import numpy as np
 
 from bci.config import load_config
-from bci.metrics import accuracy, confusion_matrix, itr, kappa
+from bci.data import load_epochs
+from bci.metrics import score
 from bci.models.csp_lda import make_csp_lda
-
-
-def load_session(processed_dir: Path, subject: int, session: str) -> tuple[np.ndarray, np.ndarray]:
-    """(X, y) for one subject and session ("T" or "E")."""
-    d = np.load(processed_dir / f"A{subject:02d}{session}.npz")
-    return d["X"].astype(np.float64), d["y"]
 
 
 def main() -> None:
@@ -38,20 +33,13 @@ def main() -> None:
 
     results = []
     for subject in args.subjects:
-        X_train, y_train = load_session(processed_dir, subject=subject, session='T')
-        X_test, y_test = load_session(processed_dir=processed_dir, subject=subject, session='E')
+        X_train, y_train = load_epochs(processed_dir, subject, "T")
+        X_test, y_test = load_epochs(processed_dir, subject, "E")
 
-        model = make_csp_lda(n_components=n_components).fit(X_train, y_train)
+        model = make_csp_lda(n_components=n_components).fit(X_train.astype(np.float64), y_train)
 
-        y_pred = model.predict(X_test)
-        acc = accuracy(y_test, y_pred)
-        results.append({
-            "subject": subject,
-            "accuracy": acc,
-            "kappa": kappa(y_test, y_pred, n_classes),
-            "itr_bits_per_min": itr(acc, n_classes, trial_s),
-            "confusion": confusion_matrix(y_test, y_pred, n_classes).tolist(),
-        })
+        y_pred = model.predict(X_test.astype(np.float64))
+        results.append({"subject": subject, **score(y_test, y_pred, n_classes, trial_s)})
 
     print(f"{'subject':>8} {'accuracy':>9} {'kappa':>6} {'ITR (bits/min)':>15}")
     for r in results:

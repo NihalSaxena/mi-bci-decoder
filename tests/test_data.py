@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from bci.data import SESSION_KEYS, epoch
+from bci.data import SESSION_KEYS, epoch, load_epochs
 
 SFREQ = 250.0
 WINDOW = dict(cue_offset_s=2.0, tmin_s=0.5, tmax_s=2.5)
@@ -32,3 +32,11 @@ def test_epoch_rejects_window_past_end():
 def test_session_keys_cover_both_moabb_conventions():
     assert {SESSION_KEYS[k] for k in ("0train", "session_T")} == {"T"}
     assert {SESSION_KEYS[k] for k in ("1test", "session_E")} == {"E"}
+
+
+def test_load_epochs_reads_what_preprocess_writes(tmp_path):
+    X, y = np.zeros((4, 22, 500), dtype=np.float32), np.array([0, 1, 2, 3])
+    np.savez(tmp_path / "A03E.npz", X=X, y=y, ch_names=np.array(["Fz"] * 22))
+    X_loaded, y_loaded = load_epochs(tmp_path, 3, "E")
+    np.testing.assert_array_equal(X_loaded, X)
+    np.testing.assert_array_equal(y_loaded, y)

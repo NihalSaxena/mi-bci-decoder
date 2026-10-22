@@ -20,6 +20,14 @@ filters:
 csp:
   n_components: 8             # virtual electrodes kept (spatial filters)
 
+eegnet:                       # training; architecture sizes live in bci.models.eegnet
+  lr: 0.001
+  batch_size: 32
+  max_epochs: 300
+  patience: 50                # stop after this many epochs without validation improvement
+  val_fraction: 0.2           # of session T, held out for early stopping
+  seed: 0
+
 metrics:
   trial_duration_s: 8.0       # full trial for ITR, not the 2 s decode window (~4x inflation)
 

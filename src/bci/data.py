@@ -4,6 +4,7 @@ Loading keeps each run continuous so it can be filtered before epoching. See
 docs/DESIGN.md, "Epoch window" and "Evaluation protocol".
 """
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
@@ -70,3 +71,9 @@ def epoch(
     if starts.min() < 0 or starts.max() + length > data.shape[1]:
         raise ValueError("an epoch window falls outside the run")
     return np.stack([data[:, s : s + length] for s in starts])
+
+
+def load_epochs(processed_dir: str | Path, subject: int, session: str) -> tuple[np.ndarray, np.ndarray]:
+    """(X, y) cached by scripts/preprocess.py for one subject and session ("T" or "E")."""
+    d = np.load(Path(processed_dir) / f"A{subject:02d}{session}.npz")
+    return d["X"], d["y"]

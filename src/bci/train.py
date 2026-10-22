@@ -12,6 +12,11 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 
+def default_device() -> str:
+    """Apple GPU when available (~27x faster for EEGNet here), else CPU."""
+    return "mps" if torch.backends.mps.is_available() else "cpu"
+
+
 def set_seed(seed: int) -> None:
     """Make weight initialisation, batch order and dropout reproducible.
 
