@@ -66,3 +66,14 @@ def itr(accuracy: float, n_classes: int, trial_duration_s: float) -> float:
     B = np.log2(N) + P * np.log2(P) + (1 - P) * np.log2((1 - P) / (N - 1))
 
     return float(B * 60 / trial_duration_s)
+
+
+def score(y_true: np.ndarray, y_pred: np.ndarray, n_classes: int, trial_duration_s: float) -> dict:
+    """All metrics for one evaluation, JSON-serialisable."""
+    acc = accuracy(y_true, y_pred)
+    return {
+        "accuracy": acc,
+        "kappa": kappa(y_true, y_pred, n_classes),
+        "itr_bits_per_min": itr(acc, n_classes, trial_duration_s),
+        "confusion": confusion_matrix(y_true, y_pred, n_classes).tolist(),
+    }
