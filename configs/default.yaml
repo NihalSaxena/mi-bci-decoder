@@ -23,9 +23,8 @@ csp:
 eegnet:                       # training; architecture sizes live in bci.models.eegnet
   lr: 0.001
   batch_size: 32
-  max_epochs: 300
-  patience: 50                # stop after this many epochs without validation improvement
-  val_fraction: 0.2           # of session T, held out for early stopping
+  max_epochs: 500             # epoch budget searched by cross-validation (as in the EEGNet paper)
+  cv_folds: 4                 # folds of session T used to pick the number of epochs
   seed: 0
 
 metrics:

@@ -3,7 +3,7 @@ import pytest
 import torch
 
 from bci.models.eegnet import EEGNet
-from bci.train import fit, predict, set_seed, split_train_val
+from bci.train import cv_epoch_curve, fit, fit_fixed, predict, set_seed, split_train_val
 
 N_CHANNELS, N_TIMES, SFREQ = 4, 128, 128.0
 
@@ -82,3 +82,21 @@ def test_same_seed_same_result():
     _, h1, _ = _train(seed=3, max_epochs=3)
     _, h2, _ = _train(seed=3, max_epochs=3)
     assert [h["val_loss"] for h in h1] == [h["val_loss"] for h in h2]
+
+
+def test_fit_fixed_trains_exactly_n_epochs_and_learns():
+    X, y = _toy_eeg(40, seed=1)
+    set_seed(0)
+    model = _small_model()
+    losses = fit_fixed(model, X, y, n_epochs=25)
+    assert len(losses) == 25 and losses[-1] < losses[0]
+    X_test, y_test = _toy_eeg(30, seed=2)
+    assert np.mean(predict(model, X_test) == y_test) > 0.9
+
+
+def test_cv_epoch_curve_averages_folds():
+    X, y = _toy_eeg(20, seed=1)
+    curve = cv_epoch_curve(_small_model, X, y, n_folds=4, max_epochs=15)
+    assert curve.shape == (15,)
+    assert np.all((0 <= curve) & (curve <= 1))
+    assert curve[-5:].mean() > curve[0]    # validation accuracy improves with training

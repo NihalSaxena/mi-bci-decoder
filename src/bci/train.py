@@ -1,13 +1,14 @@
-"""Training a PyTorch decoder: mini-batches, a validation split, early stopping.
+"""Training a PyTorch decoder: mini-batches, validation, cross-validated epoch budget.
 
 See docs/DESIGN.md, "EEGNet training".
 """
 import copy
 import random
+from collections.abc import Callable
 
 import numpy as np
 import torch
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -54,31 +55,13 @@ def fit(
     Returns one dict per epoch: epoch, train_loss, val_loss, val_acc.
     device: "cpu" (bit-for-bit reproducible) or "mps" (Apple GPU, much faster).
     """
-    torch.manual_seed(seed)  # dropout
-    model.to(device)
-    loader = DataLoader(
-        TensorDataset(_as_tensor(X_train), _as_labels(y_train)),
-        batch_size=batch_size,
-        shuffle=True,
-        generator=torch.Generator().manual_seed(seed),  # batch order
-    )
+    loader, optimizer, loss_fn = _setup(model, X_train, y_train, lr, batch_size, seed, device)
     X_val_t, y_val_t = _as_tensor(X_val).to(device), _as_labels(y_val).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    loss_fn = nn.CrossEntropyLoss()
 
     history = []
     best_loss, best_epoch, best_state = float("inf"), 0, None
     for epoch in range(max_epochs):
-        # One pass over the training set, a batch at a time: loss -> slopes -> step.
-        model.train()
-        total = 0.0
-        for xb, yb in loader:
-            xb, yb = xb.to(device), yb.to(device)
-            optimizer.zero_grad()
-            loss = loss_fn(model(xb), yb)
-            loss.backward()
-            optimizer.step()
-            total += loss.item() * len(xb)
+        train_loss = _train_epoch(model, loader, optimizer, loss_fn, device)
 
         # Check on held-out data (dropout off, no learning).
         model.eval()
@@ -87,7 +70,7 @@ def fit(
             val_loss = loss_fn(logits, y_val_t).item()
             val_acc = (logits.argmax(dim=1) == y_val_t).float().mean().item()
         history.append(
-            {"epoch": epoch, "train_loss": total / len(X_train), "val_loss": val_loss, "val_acc": val_acc}
+            {"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss, "val_acc": val_acc}
         )
 
         if val_loss < best_loss:
@@ -99,12 +82,85 @@ def fit(
     return history
 
 
+def fit_fixed(
+    model: nn.Module,
+    X: np.ndarray,
+    y: np.ndarray,
+    n_epochs: int,
+    *,
+    lr: float = 1e-3,
+    batch_size: int = 32,
+    seed: int = 0,
+    device: str = "cpu",
+) -> list[float]:
+    """Train in place on all of (X, y) for exactly n_epochs; return the training loss per epoch."""
+    loader, optimizer, loss_fn = _setup(model, X, y, lr, batch_size, seed, device)
+    return [_train_epoch(model, loader, optimizer, loss_fn, device) for _ in range(n_epochs)]
+
+
+def cv_epoch_curve(
+    build_model: Callable[[], nn.Module],
+    X: np.ndarray,
+    y: np.ndarray,
+    *,
+    n_folds: int = 4,
+    max_epochs: int = 500,
+    lr: float = 1e-3,
+    batch_size: int = 32,
+    seed: int = 0,
+    device: str = "cpu",
+) -> np.ndarray:
+    """Validation accuracy per epoch (max_epochs,), averaged over stratified folds of (X, y).
+
+    Each fold trains a fresh model for max_epochs on the other folds. Averaging
+    the curves pools every trial into validation once, so the best epoch is far
+    less noisy than with a single small validation split.
+    """
+    folds = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=seed).split(X, y)
+    curves = []
+    for train_idx, val_idx in folds:
+        set_seed(seed)
+        history = fit(
+            build_model(), X[train_idx], y[train_idx], X[val_idx], y[val_idx],
+            lr=lr, batch_size=batch_size, max_epochs=max_epochs, patience=max_epochs,
+            seed=seed, device=device,
+        )
+        curves.append([h["val_acc"] for h in history])
+    return np.mean(curves, axis=0)
+
+
 def predict(model: nn.Module, X: np.ndarray, batch_size: int = 256, device: str = "cpu") -> np.ndarray:
     """Predicted class index for each trial in X (n_trials, n_channels, n_times)."""
     model.to(device).eval()
     loader = DataLoader(TensorDataset(_as_tensor(X)), batch_size=batch_size)
     with torch.no_grad():
         return np.concatenate([model(xb.to(device)).argmax(dim=1).cpu().numpy() for (xb,) in loader])
+
+
+def _setup(model, X, y, lr, batch_size, seed, device):
+    torch.manual_seed(seed)  # dropout
+    model.to(device)
+    loader = DataLoader(
+        TensorDataset(_as_tensor(X), _as_labels(y)),
+        batch_size=batch_size,
+        shuffle=True,
+        generator=torch.Generator().manual_seed(seed),  # batch order
+    )
+    return loader, torch.optim.Adam(model.parameters(), lr=lr), nn.CrossEntropyLoss()
+
+
+def _train_epoch(model, loader, optimizer, loss_fn, device) -> float:
+    """One pass over the training data, a batch at a time: loss -> slopes -> step."""
+    model.train()
+    total, n = 0.0, 0
+    for xb, yb in loader:
+        xb, yb = xb.to(device), yb.to(device)
+        optimizer.zero_grad()
+        loss = loss_fn(model(xb), yb)
+        loss.backward()
+        optimizer.step()
+        total, n = total + loss.item() * len(xb), n + len(xb)
+    return total / n
 
 
 def _as_tensor(X: np.ndarray) -> torch.Tensor:

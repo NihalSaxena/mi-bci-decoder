@@ -82,15 +82,26 @@ model outputs logits; softmax is applied by the loss and at prediction time. The
 paper's max-norm weight constraints are omitted.
 
 ### EEGNet training
-Cross-entropy loss, Adam with learning rate 1e-3, batches of 32. A stratified 20%
-of session T is held out for validation; training stops once validation loss has
-not improved for 50 epochs (at most 300), and the weights from the best
-validation epoch are restored. Session E is never used for training or stopping;
-it is scored once at the end. Inputs are the filtered µV trials with no further
-scaling; the BatchNorm after the first layer handles scale. Seeds fix weight
-initialisation, the validation split, batch order and dropout. Training runs on
-the Apple GPU (MPS, about 27× faster than CPU here); MPS results are seeded but
-not guaranteed bit-identical, so tests run on CPU.
+Cross-entropy loss, Adam with learning rate 1e-3, batches of 32. The number of
+training epochs is chosen per subject on session T alone: 4-fold stratified
+cross-validation, each fold trained for 500 epochs, and the epoch with the best
+validation accuracy averaged over folds is kept. A fresh model is then trained on
+all 288 trials of session T for that many epochs. Session E is never used for
+training or for any choice; it is scored once at the end.
+
+Why not a single validation split with early stopping: the first version held
+out 20% of T (58 trials) and stopped after 50 epochs without improvement (max
+300). Validation accuracy swung by ±10 points between epochs, so the stopping
+point was largely noise; some subjects stopped at epoch 0 and others hit the cap,
+and mean kappa was 0.363, below CSP+LDA. Averaging the curves over folds puts all
+288 trials into validation once, and retraining on all of T uses the held-out
+data too, in the spirit of Schirrmeister et al.'s two-phase training.
+
+Inputs are the filtered µV trials with no further scaling; the BatchNorm after
+the first layer handles scale. Seeds fix weight initialisation, fold assignment,
+batch order and dropout. Training runs on the Apple GPU (MPS, about 27× faster
+than CPU here); MPS results are seeded but not guaranteed bit-identical, so tests
+run on CPU.
 
 ### Epoch window
 MOABB events mark trial start; the cue appears at +2.0 s. The decode window is
